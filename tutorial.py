@@ -1,7 +1,7 @@
 ## streamlit 라이브러리를 반드시 호출해야 streamlit에서 제공하는 기능들을 활용할 수 있음!
 ## 앞으로 streamlit 라이브러리의 기능을 사용하기 위해선 항상 streamlit.{기능명} 이런식으로 호출해야 하나, 너무 길기에 st로 줄일 것임을 미리 명시해두기.
 import streamlit as st
-from streamlit_tutorial.utilities.llm import get_basic_response, get_revised_response
+from utilities.llm import get_basic_response, get_revised_response
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
