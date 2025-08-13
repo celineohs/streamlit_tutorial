@@ -3,30 +3,79 @@
 import streamlit as st
 from utilities.llm import get_basic_response, get_revised_response
 
-# st.title('제목') <- 웹 상단에 나타날 이름.
-st.title("ChatBot")
-
-# streamlit은 session_state 를 상태 저장 용 딕셔너리로 사용함. 웹이 안정적으로 구동하기 위해선 session_state에 상호작용 내역을 저장해 둘 필요가 있음.
-# st.session_state.{딕셔너리이름} = []  <- 웹에서 나타난 상호작용을 저장하는 용도
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# session_state.messages에 message (이전 기록)이 있는 경우, 이를 마크다운 형태로 나타냄.
-# 현재 message는 {'role': "user/assistant", "content": "내용"} 형태로 저장되고 있음.
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])  # <- 웹에 나타내기
+# 프롬프트 버전을 저장하는 변수
+if "version" not in st.session_state:
+    st.session_state.version = 'Default'
 
-# userchat이라는 변수에 st.chat_input 함수를 통해 유저가 입력한 내용을 저장할 것임.
-# st.chat_input("placeholder") <- placeholder는 입력창에 아무 것도 입력되지 않은 경우에만 보여지는 지시문임.
-userchat = st.chat_input("What is up?")
-if userchat:
-    st.chat_message("user").markdown(userchat)  # <- 웹에 유저가 입력한 내용 나타내기
-    st.session_state.messages.append({"role": "user", "content": userchat})  # <- session_state에 대화 내용 저장하기
+# 새로운 메시지 시작 함수
+def reset_chat():
+    st.session_state.messages = []
 
-    # response라는 변수에 assistant의 대답을 저장함. 아직 API가 연결되지 않았기에, 유저의 입력을 반복하는 따라쟁이 챗봇을 구현함.
-    response = f"Echo: {userchat}"
-    with st.chat_message("assistant"):
-        st.markdown(response) # <- 웹에 assistant가 입력한 내용 나타내기
+# ── 설정(고정 아바타) ─────────────────────────────
+AVATAR_USER = "🎃"
+AVATAR_ASSISTANT_DEFAULT = "🤖"
+AVATAR_ASSISTANT_REVISED = "🦾"
 
-    st.session_state.messages.append({"role": "assistant", "content": response})  # <- session_state에 대화 내용 저장하기
+# ─────────────────────────────────────────
+# UI
+st.title("Chatbot")  # 챗봇 상단에 나올 이름.
+
+# 새로운 대화
+_, version, button = st.columns([2, 1, 1])   # 한 행 구성 (한 행을 4줄로 나눠서 2줄은 빈칸_으로, 1줄에는 version 정보와 button을 넣기.)
+with version:
+    st.markdown(st.session_state.version)
+with button:
+    st.button("새 대화", on_click=reset_chat, use_container_width=True)   # use_container_width : 할당된 공간에 최대한 채우기.
+
+# 기존 메시지 렌더링 (Streamlit 예시와 동일)
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"], avatar=msg.get("avatar")):
+        st.markdown(msg["content"])
+
+# 질문 입력창
+input = st.chat_input("질문")
+
+# 사용자 메시지 저장 및 표시
+if input:
+    st.session_state.messages.append({
+        "role": "user",
+        "content": input,
+        "avatar": AVATAR_USER
+    })
+    with st.chat_message("user", avatar=AVATAR_USER):
+        st.markdown(input)
+
+    # API persona 변경하며 output 만들기
+    try:
+        if input == "password":
+            st.session_state.version = "Revised"
+            assistant_text = "새로운 버전의 답변이에요." + get_revised_response(input)
+        elif input == "return":
+            st.session_state.version = "Default"
+            assistant_text = "원래 버전으로 돌아갈게요." + get_basic_response(input)
+        elif st.session_state.version == "Revised":
+            assistant_text = "계속 새로운 버전입니다." + get_revised_response(input)
+        else:
+            assistant_text = get_basic_response(input)
+    except:
+        assistant_text = "질문을 잘 이해하지 못했어요. 다시 입력해 주세요."
+
+
+    # 어시스턴트 메시지 저장/표시
+    assistant_avatar = (
+        AVATAR_ASSISTANT_REVISED
+        if st.session_state.version == "Revised"
+        else AVATAR_ASSISTANT_DEFAULT
+    )
+    with st.chat_message("assistant", avatar=assistant_avatar):
+        st.markdown(assistant_text)
+
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": assistant_text,
+        "avatar": assistant_avatar,
+    })
+    st.rerun()  # 버전 변경 재렌더링
